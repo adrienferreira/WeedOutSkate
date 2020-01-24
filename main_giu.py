@@ -20,41 +20,66 @@ FOLD_FAIL = "fail"
 FOLD_SUCC = "success"
 FOLD_OTHE = "other"
 
-TOP_X_LOUDEST = 40
+TOP_X_LOUDEST = 10
+VID_EXT = ".mp4"
 
 STR_KEY_PTS_T = "pts_time"
 STR_KEY_LAVFI = "lavfi.astats.Overall.RMS_level"
 
 FFMPEG_EXE = 'C:\\Users\\ferreira\\Documents\\LoudPeakDetect\\ffmpeg-20200115-0dc0837-win64-static\\bin\\ffmpeg', 
 
-cur_file = sys.argv[1]
-log_file = "log__" + cur_file
+DELTA_BEF_AFT = 3.0
+
+in_file = sys.argv[1]
+cur_ts = 0
+frame_img = None
+log_file = "log__" + in_file.replace(".","") + ".txt"
+
+def move_to_category(category, move_file):
+	new_file = category + "/" + move_file
+	if not os.path.exists(category):
+		os.makedirs(category)
+
+	if not os.path.exists(move_file):
+		create_preview(cur_ts+VID_EXT)
+
+	if os.path.exists(new_file):
+		os.remove(new_file)
+	os.rename(move_file, new_file)
+
+def create_preview(timestamp):
+	cmd = [
+		FFMPEG_EXE, 
+		'-i', in_file, 
+		'-ss', str(float(cur_ts) - DELTA_BEF_AFT), 
+		'-to', str(float(cur_ts) + DELTA_BEF_AFT), 
+		'-c', 'copy', 
+		"-y",
+		timestamp
+	]
+	subprocess.run(cmd, stderr=subprocess.STDOUT)
 
 def cb_video():
 	print("cb_bail")
-	cmd = [
-		FFMPEG_EXE, 
-		'-i', cur_file, 
-		'-ss', str(10), 
-		'-to', str(15), 
-		'-c', 'copy', 
-		"-y",
-		"python.mp4"
-	]
-	subprocess.run(cmd, stderr=subprocess.STDOUT)
-	os.startfile("python.mp4")
+	vid = cur_ts.replace(".","_") + VID_EXT
+	create_preview(vid)
+	os.startfile(vid)
 
-def cb_bail():
+def cb_fail():
 	print("cb_bail")
+	move_to_category(FOLD_FAIL,cur_ts.replace(".","_") + VID_EXT)
 def cb_success():
 	print("cb_success")
+	move_to_category(FOLD_SUCC,cur_ts.replace(".","_") + VID_EXT)
 def cb_other():
 	print("cb_other")
-def cb_discard():
-	print("cb_discard")
+	move_to_category(FOLD_OTHE,cur_ts.replace(".","_") + VID_EXT)
+def cb_exit():
+	print("cb_exit")
+	os._exit(0)
 
 my_cmd = [ 	FFMPEG_EXE, 
-			"-i",  cur_file,
+			"-i",  in_file,
 			"-af", "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=" + log_file,
 			"-f", "null", "-" ]
 
@@ -80,12 +105,15 @@ loudest = sorted(loud_frames, reverse = True, key = lambda i: float(i["loud_db"]
 
 for l in loudest[:TOP_X_LOUDEST]:
 	frame_img="output_"+l["timestamp"].replace(".",'_')+".gif"
+	cur_ts = l["timestamp"]
 	cmd_frame = [
 		FFMPEG_EXE,
 		"-ss", str(l["timestamp"]),
-		"-i" , cur_file,
+		"-i" , in_file,
 		"-vframes", "1",
+		"-vf","scale=800:-1",
 		"-q:v", "2",
+		"-y",
 		frame_img,
 	]
 	subprocess.run(cmd_frame, stderr=subprocess.STDOUT)
@@ -101,18 +129,18 @@ for l in loudest[:TOP_X_LOUDEST]:
 	top.pack(side=TOP)
 
 	b_video = Button(window, text="Video", command=cb_video)
-	b_bail = Button(window, text="Bail",  command=cb_bail)
+	b_fail = Button(window, text="Bail",  command=cb_fail)
 	b_success = Button(window, text="Success",  command=cb_success)
 	b_other = Button(window, text="Other", command=cb_other)
-	b_discard = Button(window, text="Discrad", bg="salmon", command=cb_discard)
+	b_exit = Button(window, text="Exit", bg="salmon", command=cb_exit)
 
 	b_video.pack(in_=top, side=LEFT)
-	b_bail.pack(in_=top, side=LEFT)
+	b_fail.pack(in_=top, side=LEFT)
 	b_success.pack(in_=top, side=LEFT)
 	b_other.pack(in_=top, side=LEFT)
-	b_discard.pack(in_=top, side=LEFT)
+	b_exit.pack(in_=top, side=LEFT)
 
 	img = PhotoImage(file=frame_img)
-	canvas.create_image(10, 10, anchor=NW, image=img)  
+	canvas.create_image(10, 10, anchor=NW, image=img)
 	window.title("WeedOutSkateboard")
 	window.mainloop()
