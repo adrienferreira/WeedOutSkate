@@ -34,6 +34,7 @@ in_file = sys.argv[1]
 cur_ts = 0
 frame_img = None
 log_file = "log__" + in_file.replace(".","") + ".txt"
+kept_ts = []
 
 def move_to_category(category, move_file):
 	new_file = category + "/" + move_file
@@ -46,6 +47,7 @@ def move_to_category(category, move_file):
 	if os.path.exists(new_file):
 		os.remove(new_file)
 	os.rename(move_file, new_file)
+	kept_ts.append(int(float(cur_ts)))
 
 def create_preview(timestamp):
 	cmd = [
@@ -122,9 +124,9 @@ for l in loudest[:TOP_X_LOUDEST]:
 	canvas = Canvas(window, width = 900, height = 500) 
 	canvas.pack()
 
-	T = Text(window, height=1, width=30)
+	T = Text(window, height=2, width=30)
 	T.pack()
-	T.insert(END, str(l["timestamp"]))
+	T.insert(END, str(l["timestamp"]) + '\n' + ', '.join(map(str, kept_ts)))
 	top = Frame(window)
 	top.pack(side=TOP)
 
